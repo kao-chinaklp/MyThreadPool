@@ -2,6 +2,7 @@
 #define MYTHREADPOOL_H
 
 #include <pthread.h>
+#include <thread>
 
 #include "Queue.h"
 
@@ -19,6 +20,18 @@ class MyThreadPool {
         struct Job {
             void (*Function)(void *); // 任务函数
             void* Data;
+        };
+
+        struct MutexLocker {
+            pthread_mutex_t* Mutex;
+            explicit MutexLocker(pthread_mutex_t* mutex):Mutex(mutex) {
+                ui attempt=1;
+                constexpr ui maxAttempts=1000;
+                while(pthread_mutex_trylock(Mutex)!=0&&attempt<maxAttempts)
+                    std::this_thread::sleep_for(std::chrono::microseconds(attempt<<=1)); // 等待锁
+                if (attempt>=maxAttempts)std::this_thread::yield(); // 极端情况，阻塞
+            }
+            ~MutexLocker() {pthread_mutex_unlock(Mutex);}
         };
 
     public:

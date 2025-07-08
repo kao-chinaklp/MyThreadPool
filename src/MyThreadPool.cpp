@@ -3,7 +3,7 @@
 #include <cstdlib>
 #include <cstring>
 
-MyThreadPool::MyThreadPool(int numWorkers, ui maxJobs) {
+MyThreadPool::MyThreadPool(const int numWorkers, const ui maxJobs) {
     if(numWorkers<1||maxJobs<1)return; // 线程数和任务数必须大于0
     if(pthread_cond_init(&JobsCond, nullptr)!=0)return; // 初始化条件变量
     if(pthread_mutex_init(&JobsMutex, nullptr)!=0)return; // 初始化互斥锁
@@ -25,19 +25,15 @@ MyThreadPool::MyThreadPool(int numWorkers, ui maxJobs) {
 }
 
 MyThreadPool::~MyThreadPool() {
-    for(int i=1;i<=SumThread;++i) {
+    for(int i=1;i<=SumThread;++i)
         Workers[i].Terminate=true;
-    }
 
-    pthread_cond_broadcast(&JobsCond);
-    pthread_mutex_lock(&JobsMutex);
-    pthread_mutex_unlock(&JobsMutex);
+    pthread_cond_broadcast(&JobsCond); // 唤醒所有线程
 
     delete[] Workers;
     pthread_cond_destroy(&JobsCond);
     pthread_mutex_destroy(&JobsMutex);
 }
-
 
 int MyThreadPool::PushJob(void (*Function)(void *), void *Data) {
     auto* job=static_cast<struct Job*>(malloc(sizeof(struct Job)));
@@ -53,20 +49,14 @@ int MyThreadPool::PushJob(void (*Function)(void *), void *Data) {
     return 1;
 }
 
-
 bool MyThreadPool::AddJob(Job* job) {
-    pthread_mutex_lock(&JobsMutex);
-    if(JobsList.Size()>=MaxJobs) {
-        pthread_mutex_unlock(&JobsMutex);
-        return false;
-    }
+    MutexLocker locker(&JobsMutex);
+    if(JobsList.Size()>=MaxJobs)return false;
 
     JobsList.Push(job);
     pthread_cond_signal(&JobsCond); // 唤醒线程
-    pthread_mutex_unlock(&JobsMutex);
     return true;
 }
-
 
 void* MyThreadPool::Run(void *Data) {
     auto* worker=static_cast<Worker *>(Data);
@@ -77,7 +67,7 @@ void* MyThreadPool::Run(void *Data) {
 void MyThreadPool::ThreadLoop(void *Data) {
     auto* worker=static_cast<Worker *>(Data);
     while(true) {
-        pthread_mutex_lock(&JobsMutex);
+        const auto* locker=new MutexLocker(&JobsMutex);
         while(JobsList.Size()==0) {
             if(worker->Terminate)break;
             pthread_cond_wait(&JobsCond,&JobsMutex);
@@ -86,7 +76,7 @@ void MyThreadPool::ThreadLoop(void *Data) {
         // 获取任务
         Job* job=JobsList.Front();
         JobsList.Pop();
-        pthread_mutex_unlock(&JobsMutex);
+        delete locker;
 
         FreeThread--;
         worker->IsWorking=true;
