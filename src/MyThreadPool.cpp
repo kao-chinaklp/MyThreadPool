@@ -13,7 +13,7 @@ MyThreadPool::MyThreadPool(const int numWorkers, const ui maxJobs) {
 
     // 初始化worker
     Workers=new Worker[numWorkers];
-    for(int i=1;i<=numWorkers;++i) {
+    for(int i=0;i<numWorkers;++i) {
         Workers[i].Pool=this;
         if(const int ret=pthread_create(&Workers[i].ThreadID, nullptr, Run, &Workers[i]);ret!=0) {
             delete[] Workers;
@@ -28,7 +28,7 @@ MyThreadPool::MyThreadPool(const int numWorkers, const ui maxJobs) {
 }
 
 MyThreadPool::~MyThreadPool() {
-    for(int i=1;i<=SumThread;++i){
+    for(int i=0;i<SumThread;++i){
         MutexLocker locker(&JobsMutex);
         Workers[i].Terminate=true;
     }
