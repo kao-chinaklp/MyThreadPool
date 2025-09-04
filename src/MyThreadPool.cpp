@@ -8,11 +8,14 @@ MyThreadPool::MyThreadPool(const int numWorkers, const ui maxJobs) {
     if(pthread_cond_init(&JobsCond, nullptr)!=0)return; // 初始化条件变量
     if(pthread_mutex_init(&JobsMutex, nullptr)!=0)return; // 初始化互斥锁
 
+    SumThread=numWorkers;
+    MaxJobs=maxJobs;
+
     // 初始化worker
     Workers=new Worker[numWorkers];
     for(int i=1;i<=numWorkers;++i) {
         Workers[i].Pool=this;
-        if(const int ret=pthread_create(&Workers[i].ThreadID, nullptr, Run, &Workers[i]); ret!=0) {
+        if(const int ret=pthread_create(&Workers[i].ThreadID, nullptr, Run, &Workers[i]);ret!=0) {
             delete[] Workers;
             return; // 创建线程失败
         }
@@ -25,8 +28,10 @@ MyThreadPool::MyThreadPool(const int numWorkers, const ui maxJobs) {
 }
 
 MyThreadPool::~MyThreadPool() {
-    for(int i=1;i<=SumThread;++i)
+    for(int i=1;i<=SumThread;++i){
+        MutexLocker locker(&JobsMutex);
         Workers[i].Terminate=true;
+    }
 
     pthread_cond_broadcast(&JobsCond); // 唤醒所有线程
 
@@ -67,11 +72,12 @@ void* MyThreadPool::Run(void *Data) {
 void MyThreadPool::ThreadLoop(void *Data) {
     auto* worker=static_cast<Worker *>(Data);
     while(true) {
-        const auto* locker=new MutexLocker(&JobsMutex);
+        auto locker=new MutexLocker(&JobsMutex);
         while(JobsList.Size()==0) {
             if(worker->Terminate)break;
-            pthread_cond_wait(&JobsCond,&JobsMutex);
+            pthread_cond_wait(&JobsCond, &JobsMutex);
         }
+        if (worker->Terminate)break;
 
         // 获取任务
         Job* job=JobsList.Front();
