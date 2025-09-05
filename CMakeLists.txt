@@ -10,11 +10,17 @@ set(EXPORT_COMPILE_COMMANDS ON)
 
 # add the executable
 file(GLOB SOURCES "src/*.cpp")
-add_executable(MyThreadPool ${SOURCES})
+add_library(MyThreadPool SHARED ${SOURCES})
 
 set(CMAKE_AR gcc-ar)
-set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS} "-static-libstdc++ -static-libgcc")
-
-target_compile_options(MyThreadPool PRIVATE -fdiagnostics-color=always -pedantic)
 
 target_include_directories(MyThreadPool PRIVATE ${CMAKE_SOURCE_DIR}/header)
+
+# Main configurations
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_definitions(MyThreadPool PRIVATE DEBUG)
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g3")
+else()
+    target_compile_definitions(MyThreadPool PRIVATE NDEBUG)
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2 -s -flto")
+endif()

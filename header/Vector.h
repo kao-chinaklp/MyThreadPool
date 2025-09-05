@@ -41,8 +41,8 @@ class Vector{
         };
 
         Vector():Vector(1){IsInit=true;};
-        explicit Vector(ui size, T val=0);
-        explicit Vector(int size, T val=0);
+        explicit Vector(ui size, T val=T());
+        explicit Vector(int size, T val=T());
         Vector(iterator _start, iterator _end);
         Vector(const Vector<T>& x);
         Vector(Vector<T>&& x)noexcept;

@@ -1,9 +1,10 @@
 #ifndef QUEUE_H
 #define QUEUE_H
 
+typedef unsigned int ui;
+
 template<class T>
 class Queue {
-    typedef unsigned int ui;
 
     public:
         Queue(); // 构造函数
