@@ -1,10 +1,11 @@
 #ifndef QUEUE_H
 #define QUEUE_H
 
-typedef unsigned int ui;
+#include <cassert>
 
 template<class T>
 class Queue {
+    typedef unsigned int ui;
 
     public:
         Queue(); // 构造函数
@@ -18,15 +19,14 @@ class Queue {
         void Clear(); // 清空队列
 
     private:
-        T* Data; // 队列头指针
+        T* Data;
         ui Head; // 队列头指针
-        ui Tail; // 队列尾指针
+        ui queueSize;
         ui Capacity; // 队列容量
 };
 
 template<class T>
-Queue<T>::Queue(): Head(0), Tail(0) {
-    Capacity=1; // 默认容量为1
+Queue<T>::Queue(): Head(0), queueSize(0), Capacity(1) {
     Data=new T[Capacity];
 }
 
@@ -37,26 +37,23 @@ Queue<T>::~Queue() {
 
 template<class T>
 void Queue<T>::Push(const T& val) {
-    if((Tail+1)%Capacity==Head) { // 队列满
+    if(queueSize==Capacity) { // 队列满
         T* NewData=new T[Capacity*2]; // 扩容
-        for(ui i=0; i<Capacity; ++i) {
-            NewData[i]=Data[(Head+i)%Capacity];
-        }
+        for(ui i=Head, len=Head+Capacity;i<len;++i)
+            NewData[i-Head]=Data[i%Capacity];
         delete[] Data;
         Data=NewData;
         Head=0;
-        Tail=Capacity;
         Capacity*=2;
     }
-    Data[Tail]=val;
-    Tail=(Tail+1)%Capacity;
+    Data[((queueSize++)+Head)%Capacity]=val;
 }
 
 template<class T>
 void Queue<T>::Pop() {
-    if(Head!=Tail) {
-        Head=(Head+1)%Capacity;
-    }
+    assert(!Empty());
+    Head=(Head+1)%Capacity;
+    --queueSize;
 }
 
 template<class T>
@@ -66,22 +63,22 @@ T& Queue<T>::Front() {
 
 template<class T>
 T& Queue<T>::Back() {
-    return Data[(Tail-1+Capacity)%Capacity];
+    return Data[(Head+queueSize-1)%Capacity];
 }
 
 template<class T>
 bool Queue<T>::Empty()const {
-    return Head==Tail;
+    return queueSize==0;
 }
 
 template<class T>
 unsigned int Queue<T>::Size()const {
-    return (Tail-Head+Capacity)%Capacity;
+    return queueSize;
 }
 
 template<class T>
 void Queue<T>::Clear() {
-    Head=Tail=0;
+    Head=queueSize=0;
 }
 
 #endif //QUEUE_H
