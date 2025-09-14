@@ -15,9 +15,8 @@ class MyThreadPool {
         };
 
         struct Worker {
-            Worker():Terminate(false), Pool(nullptr) {}
+            Worker():Pool(nullptr) {}
             pthread_t ThreadID{};
-            bool Terminate; // 判断线程是否终止
             MyThreadPool *Pool;
         };
 

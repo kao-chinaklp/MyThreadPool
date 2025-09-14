@@ -1,11 +1,12 @@
 #ifndef QUEUE_H
 #define QUEUE_H
 
-#include <cassert>
+#include <mutex>
+#include <stdexcept>
 
 template<class T>
 class Queue {
-    typedef unsigned int ui;
+    using ui=unsigned int;
 
     public:
         Queue(); // 构造函数
@@ -23,6 +24,7 @@ class Queue {
         ui Head; // 队列头指针
         ui queueSize;
         ui Capacity; // 队列容量
+        mutable std::mutex mutex;
 };
 
 template<class T>
@@ -32,11 +34,13 @@ Queue<T>::Queue(): Head(0), queueSize(0), Capacity(1) {
 
 template<class T>
 Queue<T>::~Queue() {
+    std::lock_guard lock(mutex);
     delete[] Data;
 }
 
 template<class T>
 void Queue<T>::Push(const T& val) {
+    std::lock_guard lock(mutex);
     if(queueSize==Capacity) { // 队列满
         T* NewData=new T[Capacity*2]; // 扩容
         for(ui i=Head, len=Head+Capacity;i<len;++i)
@@ -51,18 +55,21 @@ void Queue<T>::Push(const T& val) {
 
 template<class T>
 void Queue<T>::Pop() {
-    assert(!Empty());
+    std::lock_guard lock(mutex);
+    if (Empty())throw std::underflow_error("Queue is empty");
     Head=(Head+1)%Capacity;
     --queueSize;
 }
 
 template<class T>
 T& Queue<T>::Front() {
+    if (Empty()) throw std::underflow_error("Queue is empty");
     return Data[Head];
 }
 
 template<class T>
 T& Queue<T>::Back() {
+    if (Empty()) throw std::underflow_error("Queue is empty");
     return Data[(Head+queueSize-1)%Capacity];
 }
 
@@ -78,6 +85,10 @@ unsigned int Queue<T>::Size()const {
 
 template<class T>
 void Queue<T>::Clear() {
+    std::lock_guard lock(mutex);
+    delete[] Data;
+    Data=new T[1];
+    Capacity=1;
     Head=queueSize=0;
 }
 

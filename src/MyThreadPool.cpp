@@ -1,7 +1,5 @@
 #include "MyThreadPool.h"
 
-#include <mutex>
-
 MyThreadPool::MyThreadPool(const ui maxWorker): maxWorker(maxWorker) {
     if(maxWorker<1)return; // 线程数和任务数必须大于0
     if(pthread_cond_init(&cond, nullptr)!=0)return; // 初始化条件变量
@@ -17,9 +15,9 @@ MyThreadPool::MyThreadPool(const ui maxWorker): maxWorker(maxWorker) {
             workers.Clear();
             return; // 创建线程失败
         }
-        workers[i].Terminate=false;
     }
 
+    terminate=false;
     freeWorker=maxWorker;
 }
 
@@ -29,6 +27,7 @@ MyThreadPool::~MyThreadPool() {
     pthread_cond_destroy(&cond);
     pthread_cond_destroy(&cacheCond);
     pthread_mutex_destroy(&mutex);
+    pthread_mutex_destroy(&counterMutex);
 }
 
 void* MyThreadPool::CacheProcess(void* data) {
@@ -46,7 +45,9 @@ void* MyThreadPool::CacheProcess(void* data) {
 void MyThreadPool::StopAll() {
     terminate=true;
     pthread_cond_signal(&cacheCond); // 处理没处理完的任务
+    pthread_cond_broadcast(&cond); // 唤醒所有线程
 
+    // 等待所有线程结束
     for (const Worker& i:workers)
         pthread_join(i.ThreadID, nullptr);
 }
@@ -63,21 +64,30 @@ void* MyThreadPool::Run(void* data) {
 void* MyThreadPool::ThreadLoop(void* data) {
     while(true) {
         auto* locker=new Locker(&mutex);
-        if (!locker->locked) continue;
-        pthread_cond_wait(&cond, &mutex);
+        if (!locker->locked) {
+            delete locker;
+            continue;
+        }
+        while (taskList.Empty()&&!terminate) pthread_cond_wait(&cond, &mutex);
+
+        if (terminate&&taskList.Empty()) {
+            delete locker;
+            break;
+        }
+
+        auto job=taskList.Front();
+        taskList.Pop();
+        delete locker;
 
         auto* counterLocker=new Locker(&counterMutex);
         --freeWorker;
         delete counterLocker;
 
-        auto job=taskList.Front();
-        taskList.Pop();
-        delete locker;
         if(job!=nullptr) {
             job->Function(job->Data);
 
             free(job->Data);
-            free(job);
+            delete job;
         }
         counterLocker=new Locker(&counterMutex);
         ++freeWorker;
@@ -85,6 +95,8 @@ void* MyThreadPool::ThreadLoop(void* data) {
 
         pthread_cond_signal(&cacheCond);
     }
+
+    return nullptr;
 }
 
 void MyThreadPool::PushJob(void (*Function)(void*), void* Data) {
